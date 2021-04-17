@@ -1,0 +1,71 @@
+version: "3.8"
+
+networks:
+  appnetwork:
+
+volumes:
+  php-fpm-socket:
+  db-store:
+  backend:
+
+services:
+  app:
+    image: yaand/laravel-voyager-app:latest
+    build:
+      context: .
+      dockerfile: ./infra/docker/php/Dockerfile
+      network: docker-laravel-voyager_appnetwork
+      args:
+        - DB_CONNECTION=mysql
+        - DB_HOST=db
+        - DB_PORT=3306
+        - DB_DATABASE=${DB_NAME:-laravel_local}
+        - DB_USERNAME=${DB_USER:-phper}
+        - DB_PASSWORD=${DB_PASS:-secret}
+    volumes:
+      - php-fpm-socket:/var/run/php-fpm
+      - backend:/work/backend
+    environment:
+      - DB_CONNECTION=mysql
+      - DB_HOST=db
+      - DB_PORT=3306
+      - DB_DATABASE=${DB_NAME:-laravel_local}
+      - DB_USERNAME=${DB_USER:-phper}
+      - DB_PASSWORD=${DB_PASS:-secret}
+    depends_on:
+      - db
+    networks:
+      - appnetwork
+
+  web:
+    image: yaand/laravel-voyager-web:latest
+    build:
+      context: .
+      dockerfile: ./infra/docker/nginx/Dockerfile
+    ports:
+      - ${WEB_PORT:-80}:80
+    volumes:
+      - php-fpm-socket:/var/run/php-fpm
+      - backend:/work/backend
+    depends_on:
+      - app
+    networks:
+      - appnetwork
+
+  db:
+    image: yaand/laravel-voyager-db:latest
+    build:
+      context: .
+      dockerfile: ./infra/docker/mysql/Dockerfile
+    ports:
+      - ${DB_PORT:-3306}:3306
+    volumes:
+      - db-store:/var/lib/mysql
+    environment:
+      - BIND-ADDRESS=0.0.0.0
+      - MYSQL_DATABASE=${DB_NAME:-laravel_local}
+      - MYSQL_USER=${DB_USER:-phper}
+      - MYSQL_PASSWORD=${DB_PASS:-secret}
+      - MYSQL_ROOT_PASSWORD=${DB_PASS:-secret}
+    networks:
+      - appnetwork
